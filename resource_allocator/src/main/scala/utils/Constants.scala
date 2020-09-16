@@ -14,5 +14,5 @@ object Constants {
     "10xlarge" -> 32
   )
 
-  val sizeCpuMap = cpuSizeMap.flatMap(x => Map(x._2 -> x._1))
+  val sizeCpuMap: Map[Int, String] = cpuSizeMap.flatMap(x => Map(x._2 -> x._1))
 }

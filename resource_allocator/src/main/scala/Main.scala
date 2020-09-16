@@ -1,6 +1,6 @@
 import com.typesafe.scalalogging.LazyLogging
 import play.api.libs.json.Json
-import processors.Processor
+import processors.AllocationProcessor
 import utils.TypeSimplifier.MapOfMaps
 
 import scala.io.Source
@@ -13,9 +13,9 @@ object Main extends App with LazyLogging {
 
   val regionCostModelMap = Json.parse(cpuResources).as[MapOfMaps]
 
-  val processor = new Processor(regionCostModelMap)
+  val processor = new AllocationProcessor(regionCostModelMap)
 
-  println(processor.get_costs(24,115))
-  println(processor.get_costs(24,120.87f))
-  println(processor.get_costs(7,214,95))
+  logger.info(processor.get_costs(24, 115))
+  logger.info(processor.get_costs(24, 120.87f))
+  logger.info(processor.get_costs(7, 214, 95))
 }

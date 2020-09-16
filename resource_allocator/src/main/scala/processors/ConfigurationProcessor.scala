@@ -2,14 +2,14 @@ package processors
 
 import com.typesafe.scalalogging.LazyLogging
 import utils.Constants.sizeCpuMap
-import utils.{Constants, Replacer}
+import utils.{Constants, MapKeyReplacer}
 
 import scala.annotation.tailrec
 
-object RegionBasedComputation extends LazyLogging {
+object ConfigurationProcessor extends LazyLogging {
 
   def compute(regionalParameters: Map[String, Double], hours: Int, cpuCount: Int): (Double, Map[String, Int]) = {
-    val cpuCountHourlyChargePairs = Replacer.replaceMap(regionalParameters).toSeq.sortBy(x => x._1)
+    val cpuCountHourlyChargePairs = MapKeyReplacer.replaceMap(regionalParameters).toSeq.sortBy(x => x._1)
 
     if (cpuCount <= 0 || hours <= 0) {
       throw new RuntimeException(s"Invalid Request! CPU count or hours should be greater than 0")
@@ -25,7 +25,7 @@ object RegionBasedComputation extends LazyLogging {
     if (maxPrice <= 0 || hours <= 0) {
       throw new RuntimeException(s"Invalid Request! Requested Price or hours should be greater than 0")
     }
-    val cpuCountHourlyChargePairs = Replacer.replaceMap(regionalParameters).toSeq.sortBy(x => x._1)
+    val cpuCountHourlyChargePairs = MapKeyReplacer.replaceMap(regionalParameters).toSeq.sortBy(x => x._1)
     val (price, configuration) = maxPriceBasedRecursiveComputation(cpuCountHourlyChargePairs, maxPrice, hours)
     logger.info(s"The configuration requested with $maxPrice USD is granted for operational use of $hours hours")
     (price, configuration)
@@ -36,7 +36,7 @@ object RegionBasedComputation extends LazyLogging {
       throw new RuntimeException(s"Invalid Request! CPU count or hours or Requested price should be greater than 0")
     }
     val (weOfferPrice, configuration, extraAmountToComplyToUserMentionedHours, hoursOfferedForCurrentRequest) = maxPriceAndMinCpuRecursiveComputation(regionalParameters, maxPrice, hours, minCpus)
-    if(extraAmountToComplyToUserMentionedHours != 0.0) {
+    if (extraAmountToComplyToUserMentionedHours != 0.0) {
       logger.info(s"For your request, we can offer this configuration of $minCpus CPUs for $hoursOfferedForCurrentRequest hours only." +
         s"You can get to utilize full $hours hours by paying an additional $extraAmountToComplyToUserMentionedHours USD tariff.")
     }
@@ -108,19 +108,17 @@ object RegionBasedComputation extends LazyLogging {
   private def maxPriceAndMinCpuRecursiveComputation(regionalCostMap: Map[String, Double],
                                                     affordablePrice: Float,
                                                     hours: Int,
-                                                    cpuCount: Int,
-                                                    cost: Double = 0,
-                                                    serverMap: Map[String, Int] = Map()): (Double, Map[String, Int], Double, Int) = {
+                                                    cpuCount: Int): (Double, Map[String, Int], Double, Int) = {
 
 
-    val listOfTuples = Replacer.replaceMap(regionalCostMap).toSeq.sortBy(x => x._1)
+    val listOfTuples = MapKeyReplacer.replaceMap(regionalCostMap).toSeq.sortBy(x => x._1)
     val listOfCpuCores = listOfTuples.map(x => x._1).toList
-    val resultant = OptimalCpuCountMatcher.getAllPossibleCpuCombos(cpuCount,listOfCpuCores)
-    val optimalCombo = OptimalCpuCountMatcher.getBestPossibleHourToCostPackage(resultant,regionalCostMap,affordablePrice,hours)
+    val resultant = CpuCombinationProcessor.getValidCpuCombos(cpuCount, listOfCpuCores)
+    val optimalCombo = CpuCombinationProcessor.getBestPossibleHourToCostPackage(resultant, regionalCostMap)
     val perHourCharge = optimalCombo._1
     val maxPrice = perHourCharge * hours
-    val priceDifference  = maxPrice - affordablePrice
-    if(priceDifference < 0){
+    val priceDifference = maxPrice - affordablePrice
+    if (priceDifference < 0) {
       (maxPrice.floor, optimalCombo._2.flatMap(x => Map(Constants.sizeCpuMap(x._1) -> x._2)), 0.0, hours)
     }
     else {
@@ -132,7 +130,7 @@ object RegionBasedComputation extends LazyLogging {
   @tailrec
   private def computePriceLoop(maxPrice: Float, hours: Int, perHourCharge: Double): (Int, Double) = {
     val totalPrice = hours * perHourCharge
-    if(totalPrice < maxPrice)
+    if (totalPrice < maxPrice)
       (hours, totalPrice)
     else
       computePriceLoop(maxPrice, hours - 1, perHourCharge)
