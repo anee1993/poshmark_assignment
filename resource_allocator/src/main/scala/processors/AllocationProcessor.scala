@@ -4,6 +4,7 @@ import com.typesafe.scalalogging.LazyLogging
 import model.Allocation
 import play.api.libs.json.Json
 import utils.Constants.{asia_region, us_east, us_west}
+import utils.ResultFormatter
 import utils.TypeSimplifier.{MapOfMaps, Tuple}
 
 class AllocationProcessor(map: MapOfMaps) extends LazyLogging {
@@ -69,7 +70,7 @@ class AllocationProcessor(map: MapOfMaps) extends LazyLogging {
     @return - Allocation instance
    */
   private def wrapDataIntoAllocationModel(data: (Double, Map[String, Int]), region: String): Allocation = {
-    Allocation(region, "%.2f".format(data._1), data._2.toSeq)
+    Allocation(region, "%.2f".format(data._1), data._2.toList)
   }
 
   /*
@@ -80,12 +81,12 @@ class AllocationProcessor(map: MapOfMaps) extends LazyLogging {
    */
   private def getAJsonFromServerConfigs(usEastServerConfig: Tuple,
                                         usWestServerConfig: Tuple,
-                                        asiaServerConfig:   Tuple): String = {
+                                        asiaServerConfig: Tuple): String = {
     val regionalConfigurationList = List(
       wrapDataIntoAllocationModel((usEastServerConfig._1, usEastServerConfig._2), us_east),
       wrapDataIntoAllocationModel((usWestServerConfig._1, usWestServerConfig._2), us_west),
       wrapDataIntoAllocationModel((asiaServerConfig._1, asiaServerConfig._2), asia_region))
 
-    Json.toJson(regionalConfigurationList).toString()
+    new ResultFormatter().formatResult(Json.toJson(regionalConfigurationList).toString())
   }
 }
