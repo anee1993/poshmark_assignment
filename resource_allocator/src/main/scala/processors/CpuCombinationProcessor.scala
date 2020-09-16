@@ -6,6 +6,15 @@ import scala.annotation.tailrec
 
 object CpuCombinationProcessor {
 
+  /*
+    This method takes two paramters -
+    @param: cpuCount - the number of CPUs requested
+    @param: cpuList - the list of available servers (in terms of CPU core count)
+
+    and returns
+
+    @return: A list of Maps (Map of CPU core count to number of such CPUs needed)
+   */
   @tailrec
   def getValidCpuCombos(cpuCount: Int, cpuList: List[Int], resultantList: List[Map[Int, Int]] = List()): List[Map[Int, Int]] = {
     if (cpuList.isEmpty)
@@ -14,6 +23,10 @@ object CpuCombinationProcessor {
       getValidCpuCombos(cpuCount, cpuList.dropRight(1), resultantList :+ matchCount(cpuCount, cpuList))
   }
 
+  /*
+    This method is a helper method for getValidCpuCombos. It returns a Map of CPU core count to number of such CPUs needed,
+    eg: (32 -> 2) -- 32 is the cores and 2 is the number of 32 core CPUs.
+   */
   @tailrec
   private def matchCount(cpuCount: Int, cpuList: List[Int], result: Map[Int, Int] = Map()): Map[Int, Int] = {
     if (cpuCount <= 0) {

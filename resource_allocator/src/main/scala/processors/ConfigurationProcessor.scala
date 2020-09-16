@@ -2,13 +2,25 @@ package processors
 
 import com.typesafe.scalalogging.LazyLogging
 import utils.Constants.sizeCpuMap
+import utils.TypeSimplifier.{Quadruple, Tuple}
 import utils.{Constants, MapKeyReplacer}
 
 import scala.annotation.tailrec
 
 object ConfigurationProcessor extends LazyLogging {
 
-  def compute(regionalParameters: Map[String, Double], hours: Int, cpuCount: Int): (Double, Map[String, Int]) = {
+  /*
+    This method takes three parameters -
+
+    @param: regionalParameters - A map of server name with per hour usage charges for a given region, eg. us-east
+    @param: hours  - total number of hours for which the servers are requested
+    @param: cpuCount - minimum number of CPUs requested
+
+    and returns
+
+    @return: (Average price for the configuration, Server config Map --- Map(ServerName -> number of servers) tuple
+   */
+  def compute(regionalParameters: Map[String, Double], hours: Int, cpuCount: Int): Tuple = {
     val cpuCountHourlyChargePairs = MapKeyReplacer.replaceMap(regionalParameters).toSeq.sortBy(x => x._1)
 
     if (cpuCount <= 0 || hours <= 0) {
@@ -21,7 +33,18 @@ object ConfigurationProcessor extends LazyLogging {
     }
   }
 
-  def compute(regionalParameters: Map[String, Double], hours: Int, maxPrice: Float): (Double, Map[String, Int]) = {
+  /*
+   This method takes three parameters -
+
+   @param: regionalParameters - A map of server name with per hour usage charges for a given region, eg. us-east
+   @param: hours  - total number of hours for which the servers are requested
+   @param: maxPrice - maximum price the user is willing to bear
+
+   and returns
+
+   @return: (Average price for the configuration, Server config Map --- Map(ServerName -> number of servers) tuple
+  */
+  def compute(regionalParameters: Map[String, Double], hours: Int, maxPrice: Float): Tuple = {
     if (maxPrice <= 0 || hours <= 0) {
       throw new RuntimeException(s"Invalid Request! Requested Price or hours should be greater than 0")
     }
@@ -31,7 +54,19 @@ object ConfigurationProcessor extends LazyLogging {
     (price, configuration)
   }
 
-  def compute(regionalParameters: Map[String, Double], hours: Int, minCpus: Int, maxPrice: Float): (Double, Map[String, Int]) = {
+  /*
+   This method takes three parameters -
+
+   @param: regionalParameters - A map of server name with per hour usage charges for a given region, eg. us-east
+   @param: hours  - total number of hours for which the servers are requested
+   @param: cpuCount - minimum number of CPUs requested
+   @param: maxPrice - maximum price the user is willing to bear
+
+   and returns
+
+   @return: (Average price for the configuration, Server config Map --- Map(ServerName -> number of servers) tuple
+  */
+  def compute(regionalParameters: Map[String, Double], hours: Int, minCpus: Int, maxPrice: Float): Tuple = {
     if (minCpus <= 0 || hours <= 0 || maxPrice <= 0) {
       throw new RuntimeException(s"Invalid Request! CPU count or hours or Requested price should be greater than 0")
     }
@@ -45,12 +80,23 @@ object ConfigurationProcessor extends LazyLogging {
     (weOfferPrice, configuration)
   }
 
+  /*
+   This method takes 3 parameters (two default which will hold the result) -
+   @param: listOfTuples - A Sequence of tuple - (cpu cores, cost per hour of usage)
+   @param: cpuCount - Minimum CPUs the user is requesting for
+   @param: hours - The total hours for which the servers are requested by user
+
+   and returns
+
+   @return: (Price incurred for resource usage for said hours, Map of Server Name to count of servers)
+  */
+
   @tailrec
   private def cpuCountBasedRecursiveComputation(listOfTuples: Seq[(Int, Double)],
                                                 cpuCount: Int,
                                                 hours: Int,
                                                 cost: Double = 0,
-                                                serverMap: Map[String, Int] = Map()): (Double, Map[String, Int]) = {
+                                                serverMap: Map[String, Int] = Map()): Tuple = {
     if (cpuCount <= 0 || listOfTuples.isEmpty) {
       ("%.2f".format(cost).toDouble, serverMap)
     }
@@ -74,12 +120,22 @@ object ConfigurationProcessor extends LazyLogging {
     }
   }
 
+  /*
+    This method takes 3 parameters (two default which will hold the result) -
+    @param: listOfTuples - A Sequence of tuple - (cpu cores, cost per hour of usage)
+    @param: maxPrice - Maximum price the user is willing to pay
+    @param: hours - The total hours for which the servers are requested by user
+
+    and returns
+
+    @return: (Price incurred within range of maxPrice, Map of Server Name to count of servers)
+   */
   @tailrec
   private def maxPriceBasedRecursiveComputation(listOfTuples: Seq[(Int, Double)],
                                                 maxPrice: Float,
                                                 hours: Int,
                                                 cost: Double = 0,
-                                                serverMap: Map[String, Int] = Map()): (Double, Map[String, Int]) = {
+                                                serverMap: Map[String, Int] = Map()): Tuple = {
     if (listOfTuples.isEmpty) {
       ("%.2f".format(cost).toDouble, serverMap)
     }
@@ -105,10 +161,24 @@ object ConfigurationProcessor extends LazyLogging {
     }
   }
 
+  /*
+    This method takes 4 paramters -
+    @param: regionalCostMap - The Map of server name to cost per hour
+    @param: affordablePrice - The maximum price user is willing to pay
+    @param: hours - The maximum hours for which user wants to use the servers
+    @param: cpuCount - the number of CPUs user has requested
+
+    and returns
+
+    @return: (the best price,
+    Map of server config,
+    Additional price that user might have to pay to use the config for requested hours,
+    Maximum hours the user will get to use this configuration for his "quoted" price) - quadruple?
+   */
   private def maxPriceAndMinCpuRecursiveComputation(regionalCostMap: Map[String, Double],
                                                     affordablePrice: Float,
                                                     hours: Int,
-                                                    cpuCount: Int): (Double, Map[String, Int], Double, Int) = {
+                                                    cpuCount: Int): Quadruple = {
 
 
     val listOfTuples = MapKeyReplacer.replaceMap(regionalCostMap).toSeq.sortBy(x => x._1)
@@ -122,17 +192,22 @@ object ConfigurationProcessor extends LazyLogging {
       (maxPrice.floor, optimalCombo._2.flatMap(x => Map(Constants.sizeCpuMap(x._1) -> x._2)), 0.0, hours)
     }
     else {
-      val possibleValue = computePriceLoop(affordablePrice, hours, perHourCharge)
+      val possibleValue = getEffectiveHoursAndPrice(affordablePrice, hours, perHourCharge)
       ("%.2f".format(possibleValue._2).toDouble, optimalCombo._2.flatMap(x => Map(Constants.sizeCpuMap(x._1) -> x._2)), "%.2f".format(priceDifference).toDouble, possibleValue._1)
     }
   }
 
+  /*
+     This method identifies what is the maximum hours that a given configuration can be run based on user request.
+
+     @return: (max hours for which a given configuration can be comfortably run within user budget, the price it incurs for the said hours) tuple
+   */
   @tailrec
-  private def computePriceLoop(maxPrice: Float, hours: Int, perHourCharge: Double): (Int, Double) = {
+  private def getEffectiveHoursAndPrice(maxPrice: Float, hours: Int, perHourCharge: Double): (Int, Double) = {
     val totalPrice = hours * perHourCharge
     if (totalPrice < maxPrice)
       (hours, totalPrice)
     else
-      computePriceLoop(maxPrice, hours - 1, perHourCharge)
+      getEffectiveHoursAndPrice(maxPrice, hours - 1, perHourCharge)
   }
 }
